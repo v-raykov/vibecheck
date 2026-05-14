@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
+    'drf_spectacular',
     'api'
 ]
 
@@ -130,7 +131,6 @@ STATIC_URL = 'static/'
 
 from datetime import timedelta
 
-# 1. Update Authentication Classes
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -138,6 +138,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 SIMPLE_JWT = {
@@ -145,5 +146,14 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
-    'AUTH_HEADER_TYPES': ('Bearer',),  # Standard "Bearer <token>"
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Vibe Check API',
+    'DESCRIPTION': 'Social vibe sharing with JWT and Clean Architecture',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_PATCH': True,
+    'COMPONENT_SPLIT_REQUEST': True,
 }
