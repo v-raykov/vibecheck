@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
@@ -36,8 +37,8 @@ class VibeViewSet(viewsets.ModelViewSet):
         serializer.save(user=self.request.user)
 
     @action(detail=True, methods=['post'])
-    def like(self, request, _pk=None):
-        vibe = self.get_object()
+    def like(self, request, pk=None):
+        vibe = get_object_or_404(Vibe, pk=pk)
         user = request.user
 
         if vibe.user == user:
