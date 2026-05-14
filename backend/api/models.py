@@ -1,6 +1,7 @@
-from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.db import models
+
 
 class Vibe(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="vibes")
@@ -14,6 +15,7 @@ class Vibe(models.Model):
 
     def __str__(self):
         return f"{self.user.username}: {self.percentage}%"
+
 
 class VibeLike(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)

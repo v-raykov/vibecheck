@@ -1,20 +1,30 @@
-from rest_framework import status, viewsets, permissions
-from rest_framework.response import Response
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
 from .models import Vibe, VibeLike
 from .serializers import UserSerializer, VibeSerializer
 
+
 class RegisterView(APIView):
     permission_classes = [AllowAny]
+    authentication_classes = []
+    serializer_class = UserSerializer
 
     def post(self, request):
-        serializer = UserSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response({"message": "User created successfully"}, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"message": "User created"}, status=status.HTTP_201_CREATED)
+
+
+class CurrentUserView(APIView):
+    def get(self, request):
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
+
 
 class VibeViewSet(viewsets.ModelViewSet):
     serializer_class = VibeSerializer
