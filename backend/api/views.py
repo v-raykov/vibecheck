@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
-from .models import Vibe
+from .models import Vibe, VibeLike
 from .serializers import UserSerializer, VibeSerializer
 
 class RegisterView(APIView):
@@ -36,9 +36,11 @@ class VibeViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if vibe.likes.filter(id=user.id).exists():
-            vibe.likes.remove(user)
+        like_qs = VibeLike.objects.filter(user=user, vibe=vibe)
+
+        if like_qs.exists():
+            like_qs.delete()
             return Response({'status': 'unliked'}, status=status.HTTP_200_OK)
-        else:
-            vibe.likes.add(user)
-            return Response({'status': 'liked'}, status=status.HTTP_200_OK)
+
+        VibeLike.objects.create(user=user, vibe=vibe)
+        return Response({'status': 'liked'}, status=status.HTTP_201_CREATED)

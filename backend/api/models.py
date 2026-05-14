@@ -9,8 +9,16 @@ class Vibe(models.Model):
     )
     emoji = models.CharField(max_length=10)
     content = models.CharField(max_length=140, blank=True, null=True)
-    likes = models.ManyToManyField(User, related_name="liked_vibes", blank=True)
+    likes = models.ManyToManyField(User, through='VibeLike', related_name="liked_vibes", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.user.username}: {self.percentage}%"
+
+class VibeLike(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    vibe = models.ForeignKey(Vibe, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'vibe')
