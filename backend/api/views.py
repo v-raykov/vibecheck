@@ -3,7 +3,6 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework import viewsets
 from rest_framework.decorators import action
-from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -28,7 +27,7 @@ class RegisterView(APIView):
 
 class CurrentUserView(APIView):
     def get(self, request):
-        serializer = UserSerializer(data=request.user)
+        serializer = UserSerializer(request.user)
         return Response(serializer.data)
 
 
@@ -93,6 +92,7 @@ class MusicSearchView(APIView):
 
         tracks = MusicApiService.search_tracks(query_string, limit=5)
         return Response({"query": query_string, "tracks": tracks})
+
 
 class MusicTrackDetailsView(APIView):
     @extend_schema(parameters=[MusicTrackDetailsQuerySerializer])
