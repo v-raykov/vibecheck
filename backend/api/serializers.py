@@ -1,6 +1,8 @@
-from rest_framework import serializers
 from django.contrib.auth.models import User
+from rest_framework import serializers
+
 from .models import Vibe
+
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
@@ -11,6 +13,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         return User.objects.create_user(**validated_data)
+
 
 class VibeSerializer(serializers.ModelSerializer):
     user = serializers.ReadOnlyField(source='user.username')
@@ -26,3 +29,11 @@ class VibeSerializer(serializers.ModelSerializer):
         if user.is_authenticated:
             return obj.likes.filter(id=user.id).exists()
         return False
+
+
+class MusicSuggestionsQuerySerializer(serializers.Serializer):
+    percentage = serializers.IntegerField(required=False, default=50, min_value=0, max_value=100)
+
+
+class MusicSearchQuerySerializer(serializers.Serializer):
+    q = serializers.CharField(required=True, allow_blank=False)
