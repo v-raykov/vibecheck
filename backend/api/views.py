@@ -3,12 +3,14 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Vibe, VibeLike
-from .serializers import UserSerializer, VibeSerializer, MusicSearchQuerySerializer, MusicSuggestionsQuerySerializer
+from .serializers import UserSerializer, VibeSerializer, MusicSearchQuerySerializer, MusicSuggestionsQuerySerializer, \
+    MusicTrackDetailsQuerySerializer
 from .services import MusicApiService
 
 
@@ -91,3 +93,13 @@ class MusicSearchView(APIView):
 
         tracks = MusicApiService.search_tracks(query_string, limit=5)
         return Response({"query": query_string, "tracks": tracks})
+
+class MusicTrackDetailsView(APIView):
+    @extend_schema(parameters=[MusicTrackDetailsQuerySerializer])
+    def get(self, request):
+        serializer = MusicTrackDetailsQuerySerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+
+        query_string = serializer.validated_data.get('track_id').strip()
+
+        return Response(MusicApiService.get_track_details(query_string))

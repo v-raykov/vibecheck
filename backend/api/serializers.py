@@ -22,7 +22,8 @@ class VibeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Vibe
-        fields = ['id', 'user', 'percentage', 'emoji', 'content', 'likes_count', 'is_liked', 'created_at', 'track_id', 'snippet_start', 'snippet_end']
+        fields = ['id', 'user', 'percentage', 'emoji', 'content', 'likes_count', 'is_liked', 'created_at', 'track_id',
+                  'snippet_start', 'snippet_end']
 
     def get_is_liked(self, obj):
         user = self.context['request'].user
@@ -37,3 +38,7 @@ class MusicSuggestionsQuerySerializer(serializers.Serializer):
 
 class MusicSearchQuerySerializer(serializers.Serializer):
     q = serializers.CharField(required=True, allow_blank=False)
+
+
+class MusicTrackDetailsQuerySerializer(serializers.Serializer):
+    track_id = serializers.CharField(required=True, allow_blank=False)

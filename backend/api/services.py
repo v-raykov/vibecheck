@@ -2,6 +2,9 @@ import json
 import logging
 import urllib.parse
 import urllib.request
+from typing import Any
+
+from .types import TrackData
 
 logger = logging.getLogger(__name__)
 
@@ -11,61 +14,83 @@ class MusicApiService:
     TIMEOUT_SECONDS = 5
 
     @classmethod
-    def _normalize_tracks(cls, raw_response):
-        if not raw_response or not isinstance(raw_response, dict):
-            return []
-
-        raw_tracks = raw_response.get("data")
-        if not raw_tracks or not isinstance(raw_tracks, list):
-            return []
-
-        formatted_list = []
-        for track in raw_tracks:
-            if not isinstance(track, dict):
-                continue
-
-            artist_name = "Unknown Artist"
-            artists_list = track.get("artists")
-            if artists_list and isinstance(artists_list, list):
-                first_artist = artists_list[0]
-                if isinstance(first_artist, list) and len(first_artist) > 1:
-                    artist_name = first_artist[1].get("name", "Unknown Artist")
-
-            formatted_list.append({
-                "track_id": str(track.get("id", "")),
-                "title": track.get("title", "Unknown Title"),
-                "artist": artist_name,
-                "cover_url": track.get("thumbnails", {}).get("md", ""),
-                "stream_url": track.get("files", {}).get("mp3", ""),
-                "default_snippet": {
-                    "start_seconds": 30,
-                    "end_seconds": 50
-                }
-            })
-        return formatted_list
+    def search_tracks(cls, query: str, limit: int = 5) -> list[TrackData]:
+        raw = cls._dispatch_request("tracks/search", {"query": query, "limit": limit})
+        return cls._normalize_tracks(raw)
 
     @classmethod
-    def _dispatch_request(cls, endpoint_path, query_params):
-        encoded_params = urllib.parse.urlencode(query_params)
-        target_url = f"{cls.BASE_URL}/{endpoint_path}?{encoded_params}"
+    def get_track_details(cls, track_id: str) -> TrackData | None:
+        raw = cls._dispatch_request(f"tracks/{track_id}", None)
+        track = cls._extract_single_track(raw)
+        return cls._map_track(track) if track else None
 
-        request = urllib.request.Request(target_url, method="GET")
-
+    @classmethod
+    def _dispatch_request(cls, endpoint_path: str, query_params: dict[str, Any] | None) -> dict[str, Any]:
+        qs = "?" + urllib.parse.urlencode(query_params) if query_params else ""
+        url = f"{cls.BASE_URL}/{endpoint_path}{qs}"
+        req = urllib.request.Request(url, method="GET")
         try:
-            with urllib.request.urlopen(request, timeout=cls.TIMEOUT_SECONDS) as response:
-                if response.status == 200:
-                    raw_data = response.read().decode('utf-8')
-                    return json.loads(raw_data)
-                return {}
+            with urllib.request.urlopen(req, timeout=cls.TIMEOUT_SECONDS) as res:
+                if res.status != 200:
+                    return {}
+                return json.loads(res.read().decode("utf-8"))
         except Exception as e:
-            logger.error(f"Network error communicating with Music API {endpoint_path}: {str(e)}")
+            logger.error("Music API error %s: %s", endpoint_path, e)
             return {}
 
     @classmethod
-    def search_tracks(cls, query_string, limit=5):
-        params = {
-            "query": query_string,
-            "limit": limit
+    def _normalize_tracks(cls, raw: dict[str, Any]) -> list[TrackData]:
+        if not isinstance(raw, dict):
+            return []
+        data = raw.get("data")
+        if not isinstance(data, list):
+            return []
+        result = []
+        for item in data:
+            mapped = cls._map_track(item)
+            if mapped:
+                result.append(mapped)
+        return result
+
+    @staticmethod
+    def _map_track(track: dict[str, Any]) -> TrackData | None:
+        if not isinstance(track, dict):
+            return None
+
+        artist = "Unknown Artist"
+        artists = track.get("artists")
+
+        if isinstance(artists, list) and artists:
+            first = artists[0]
+            if isinstance(first, list) and len(first) > 1 and isinstance(first[1], dict):
+                artist = str(first[1].get("name", artist))
+
+        thumbnails = track.get("thumbnails")
+        cover_url = thumbnails.get("md", "") if isinstance(thumbnails, dict) else ""
+
+        files = track.get("files")
+        stream_url = files.get("mp3", "") if isinstance(files, dict) else ""
+
+        result: TrackData = {
+            "track_id": str(track.get("id", "")),
+            "title": str(track.get("title", "Unknown Title")),
+            "artist": artist,
+            "cover_url": cover_url,
+            "stream_url": stream_url,
+            "default_snippet": {
+                "start_seconds": 30,
+                "end_seconds": 50,
+            },
         }
-        raw_data = cls._dispatch_request("tracks/search", params)
-        return cls._normalize_tracks(raw_data)
+        return result
+
+    @classmethod
+    def _extract_single_track(cls, raw: dict[str, Any]) -> dict[str, Any] | None:
+        if not isinstance(raw, dict):
+            return None
+        data = raw.get("data")
+        if isinstance(data, dict):
+            return data
+        if isinstance(data, list) and data:
+            return data[0]
+        return None

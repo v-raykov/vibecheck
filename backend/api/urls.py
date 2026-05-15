@@ -3,7 +3,8 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, Sp
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from .views import RegisterView, VibeViewSet, CurrentUserView, MusicSuggestionsView, MusicSearchView
+from .views import RegisterView, VibeViewSet, CurrentUserView, MusicSuggestionsView, MusicSearchView, \
+    MusicTrackDetailsView
 
 router = DefaultRouter()
 router.register(r'vibes', VibeViewSet, basename='vibe')
@@ -22,6 +23,7 @@ urlpatterns = [
     # Music
     path('music/suggestions/', MusicSuggestionsView.as_view(), name='music-suggestions'),
     path('music/search/', MusicSearchView.as_view(), name='music-search'),
+    path('music/details/', MusicTrackDetailsView.as_view(), name='music-details'),
 
     path('', include(router.urls)),
 ]
