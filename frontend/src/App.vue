@@ -4,12 +4,6 @@ import { RouterView } from 'vue-router'
 
 <template>
   <div id="app">
-    <header v-if="$route.name !== 'auth'">
-      <nav>
-        <h1>VibeCheck</h1>
-      </nav>
-    </header>
-
     <RouterView />
   </div>
 </template>

@@ -1,31 +1,50 @@
 <script setup>
-import {onMounted, ref} from 'vue';
-import {useRouter} from 'vue-router';
+import { onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import api from '../api';
 import VibeForm from '../components/VibeForm.vue';
 import VibeCard from '../components/VibeCard.vue';
 
 const router = useRouter();
 const vibes = ref([]);
-const nextPage = ref(null);
+
+const currentPage = ref(1);
+const hasNext = ref(false);
+const hasPrev = ref(false);
+
 const loading = ref(false);
 const showForm = ref(false);
 const currentUser = localStorage.getItem('username');
 
-const fetchVibes = async (url = '/vibes/') => {
+const activeVibeId = ref(null);
+
+const fetchVibes = async (page = 1) => {
   loading.value = true;
   try {
-    const res = await api.get(url);
-    if (url === '/vibes/') {
-      vibes.value = res.data.results;
-    } else {
-      vibes.value.push(...res.data.results);
-    }
-    nextPage.value = res.data.next;
+    const res = await api.get('/vibes/', {
+      params: { page: page }
+    });
+    vibes.value = res.data.results || [];
+    hasNext.value = !!res.data.next;
+    hasPrev.value = !!res.data.previous;
+    currentPage.value = page;
+    activeVibeId.value = null;
   } catch (err) {
     console.error(err);
   } finally {
     loading.value = false;
+  }
+};
+
+const nextPage = () => {
+  if (hasNext.value && !loading.value) {
+    fetchVibes(currentPage.value + 1);
+  }
+};
+
+const prevPage = () => {
+  if (hasPrev.value && !loading.value) {
+    fetchVibes(currentPage.value - 1);
   }
 };
 
@@ -37,11 +56,27 @@ const handleLogout = () => {
 };
 
 const addNewVibe = (vibe) => {
-  vibes.value.unshift(vibe);
+  if (currentPage.value === 1) {
+    vibes.value.unshift(vibe);
+    // Keep it looking tight if we exceed standard view capacity on first page
+    if (vibes.value.length > 6) vibes.value.pop();
+  } else {
+    fetchVibes(1);
+  }
   showForm.value = false;
 };
 
-onMounted(fetchVibes);
+const handleTrackPlaybackToggle = (vibeId) => {
+  if (activeVibeId.value === vibeId) {
+    activeVibeId.value = null;
+  } else {
+    activeVibeId.value = vibeId;
+  }
+};
+
+onMounted(() => {
+  fetchVibes(1);
+});
 </script>
 
 <template>
@@ -51,6 +86,26 @@ onMounted(fetchVibes);
         <h1 class="logo">VibeCheck</h1>
 
         <div class="nav-actions">
+          <div class="pagination-controls">
+            <button
+                @click="prevPage"
+                class="nav-arrow-btn"
+                :disabled="!hasPrev || loading"
+                title="Previous Page"
+            >
+              ←
+            </button>
+            <span class="page-indicator">Page {{ currentPage }}</span>
+            <button
+                @click="nextPage"
+                class="nav-arrow-btn"
+                :disabled="!hasNext || loading"
+                title="Next Page"
+            >
+              →
+            </button>
+          </div>
+
           <button @click="showForm = !showForm" class="create-trigger" :class="{ active: showForm }">
             {{ showForm ? 'Close' : 'Post Vibe' }}
           </button>
@@ -70,18 +125,22 @@ onMounted(fetchVibes);
       </div>
     </Transition>
 
-    <main class="vibe-stack">
-      <VibeCard
-          v-for="vibe in vibes"
-          :key="vibe.id"
-          :vibe="vibe"
-          :is-mine="vibe.user === currentUser"
-      />
+    <main class="feed-wrapper">
+      <div v-if="loading && vibes.length === 0" class="loader-state">
+        <div class="spinner"></div>
+      </div>
 
-      <div v-if="nextPage" class="pagination">
-        <button @click="fetchVibes(nextPage)" :disabled="loading" class="load-more-btn">
-          {{ loading ? '...' : 'Show More' }}
-        </button>
+      <div v-else class="grid-scroll-container">
+        <div class="vibe-grid">
+          <VibeCard
+              v-for="vibe in vibes"
+              :key="vibe.id"
+              :vibe="vibe"
+              :is-mine="vibe.user === currentUser"
+              :is-currently-playing="activeVibeId === vibe.id"
+              @toggle-playback="handleTrackPlaybackToggle"
+          />
+        </div>
       </div>
     </main>
   </div>
@@ -89,25 +148,28 @@ onMounted(fetchVibes);
 
 <style scoped>
 .feed-container {
-  min-height: 100vh;
+  height: 100vh;
+  width: 100vw;
   background: #0f172a;
-  padding-top: 80px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Prevents global page scroll */
+  box-sizing: border-box;
 }
 
 .main-nav {
-  position: fixed;
-  top: 0;
-  width: 100%;
+  height: 70px;
   background: rgba(15, 23, 42, 0.8);
   backdrop-filter: blur(12px);
-  z-index: 100;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
 }
 
 .nav-content {
-  max-width: 800px;
+  max-width: 1200px;
+  height: 100%;
   margin: 0 auto;
-  padding: 1rem;
+  padding: 0 1rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -123,7 +185,51 @@ onMounted(fetchVibes);
 .nav-actions {
   display: flex;
   align-items: center;
+  gap: 20px;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
   gap: 12px;
+  background: rgba(15, 23, 42, 0.6);
+  padding: 4px 8px;
+  border-radius: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.nav-arrow-btn {
+  background: #334155;
+  color: #f8fafc;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.nav-arrow-btn:hover:not(:disabled) {
+  background: #475569;
+  color: #6366f1;
+}
+
+.nav-arrow-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.page-indicator {
+  color: #94a3b8;
+  font-size: 0.85rem;
+  font-weight: 700;
+  min-width: 55px;
+  text-align: center;
 }
 
 .create-trigger {
@@ -135,6 +241,10 @@ onMounted(fetchVibes);
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
+}
+
+.create-trigger:hover {
+  background: #4f46e5;
 }
 
 .logout-btn {
@@ -175,27 +285,59 @@ onMounted(fetchVibes);
   padding: 20px;
 }
 
-.vibe-stack {
-  max-width: 500px;
+.feed-wrapper {
+  flex: 1;
+  max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
-  padding: 20px;
+  padding: 1.5rem 1rem;
+  box-sizing: border-box;
+  min-height: 0; /* Critical structure item for nested flex box containment */
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
 }
 
-.pagination {
-  margin-top: 20px;
+.grid-scroll-container {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto; /* Just in case extra rows spill over on compact resolution screens */
+  padding-right: 4px;
 }
 
-.load-more-btn {
-  width: 100%;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #94a3b8;
-  padding: 1rem;
-  border-radius: 12px;
-  cursor: pointer;
+/* Custom minimal scrollbar styling for the inner grid box if necessary */
+.grid-scroll-container::-webkit-scrollbar {
+  width: 6px;
+}
+.grid-scroll-container::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+.vibe-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.loader-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex: 1;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(99, 102, 241, 0.1);
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .fade-slide-enter-active, .fade-slide-leave-active {

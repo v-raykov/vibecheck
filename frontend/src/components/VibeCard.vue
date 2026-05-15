@@ -1,38 +1,81 @@
 <script setup>
-import { computed, ref, onMounted, onUnmounted } from 'vue';
+import {computed, onMounted, ref, watch} from 'vue';
 import api from '../api';
 
-const props = defineProps(['vibe', 'isMine']);
+const props = defineProps(['vibe', 'isMine', 'isCurrentlyPlaying']);
+const emit = defineEmits(['toggle-playback']);
 
 const localLikes = ref(Number(props.vibe.likes_count) || 0);
 const isLiked = ref(!!props.vibe.is_liked);
 
 const audioEl = ref(null);
-const isPlaying = ref(false);
 const trackDetails = ref(null);
 
 onMounted(async () => {
   if (props.vibe.track_id) {
     try {
       const res = await api.get('/music/details/', {
-        params: { track_id: props.vibe.track_id }
+        params: {track_id: props.vibe.track_id}
       });
       trackDetails.value = res.data;
     } catch (err) {
-      console.error("Failed fetching track details", err);
+      console.error(err);
     }
   }
 });
 
+watch(() => props.isCurrentlyPlaying, (shouldPlay) => {
+  if (shouldPlay) {
+    if (!audioEl.value) {
+      const streamUrl = trackDetails.value?.stream_url || `https://data.freetouse.com/music/tracks/${props.vibe.track_id}/file/mp3/file.mp3`;
+      audioEl.value = new Audio(streamUrl);
+      audioEl.value.preload = "metadata";
+
+      audioEl.value.addEventListener('timeupdate', () => {
+        if (audioEl.value.currentTime >= props.vibe.snippet_end) {
+          audioEl.value.pause();
+          audioEl.value.currentTime = props.vibe.snippet_start;
+          if (props.isCurrentlyPlaying) {
+            emit('toggle-playback', props.vibe.track_id);
+          }
+        }
+      });
+
+      audioEl.value.addEventListener('ended', () => {
+        audioEl.value.currentTime = props.vibe.snippet_start;
+        if (props.isCurrentlyPlaying) {
+          emit('toggle-playback', props.vibe.track_id);
+        }
+      });
+    }
+    audioEl.value.currentTime = props.vibe.snippet_start;
+    audioEl.value.play().catch(err => console.error(err));
+  } else {
+    if (audioEl.value) {
+      audioEl.value.pause();
+    }
+  }
+});
+
+const handleToggleRequest = () => {
+  if (!props.vibe.track_id) return;
+  emit('toggle-playback', props.vibe.track_id);
+};
+
 const handleLike = async () => {
   try {
-    const res = await api.post(`/vibes/${props.vibe.id}/like/`);
+    await api.post(`/vibes/${props.vibe.id}/like/`);
 
-    if (res.data && typeof res.data.likes_count !== 'undefined') {
-      localLikes.value = Number(res.data.likes_count);
+    const res = await api.get(`/vibes/${props.vibe.id}/`);
+
+    if (res.data) {
+      if (typeof res.data.likes_count !== 'undefined') {
+        localLikes.value = Number(res.data.likes_count);
+      }
+      if (typeof res.data.is_liked !== 'undefined') {
+        isLiked.value = !!res.data.is_liked;
+      }
     }
-
-    isLiked.value = !isLiked.value;
   } catch (err) {
     if (err.response?.status === 400) {
       alert("You cannot vibe with your own post.");
@@ -40,48 +83,6 @@ const handleLike = async () => {
     console.error(err);
   }
 };
-
-const toggleSnippet = () => {
-  if (!props.vibe.track_id) return;
-
-  if (!audioEl.value) {
-    const streamUrl = trackDetails.value?.stream_url || `https://data.freetouse.com/music/tracks/${props.vibe.track_id}/file/mp3/file.mp3`;
-    audioEl.value = new Audio(streamUrl);
-    audioEl.value.preload = "metadata";
-
-    audioEl.value.addEventListener('timeupdate', () => {
-      if (audioEl.value.currentTime >= props.vibe.snippet_end) {
-        audioEl.value.pause();
-        audioEl.value.currentTime = props.vibe.snippet_start;
-        isPlaying.value = false;
-      }
-    });
-
-    audioEl.value.addEventListener('ended', () => {
-      isPlaying.value = false;
-    });
-  }
-
-  if (isPlaying.value) {
-    audioEl.value.pause();
-    isPlaying.value = false;
-  } else {
-    if (
-        audioEl.value.currentTime < props.vibe.snippet_start ||
-        audioEl.value.currentTime >= props.vibe.snippet_end
-    ) {
-      audioEl.value.currentTime = props.vibe.snippet_start;
-    }
-    audioEl.value.play();
-    isPlaying.value = true;
-  }
-};
-
-onUnmounted(() => {
-  if (audioEl.value) {
-    audioEl.value.pause();
-  }
-});
 
 const likeText = computed(() => {
   const count = localLikes.value;
@@ -121,8 +122,8 @@ const likeText = computed(() => {
       </div>
 
       <div v-if="vibe.track_id" class="player-wrapper">
-        <button type="button" class="inline-play-btn" @click="toggleSnippet">
-          {{ isPlaying ? '❚❚' : '▶' }}
+        <button type="button" class="inline-play-btn" @click="handleToggleRequest">
+          {{ isCurrentlyPlaying ? '❚❚' : '▶' }}
         </button>
 
         <img
@@ -161,8 +162,10 @@ const likeText = computed(() => {
   padding: 1.25rem;
   width: 100%;
   max-width: 580px;
+  height: 250px;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   gap: 12px;
   box-sizing: border-box;
 }
@@ -273,6 +276,9 @@ const likeText = computed(() => {
 
 .content-row {
   margin-top: 2px;
+  flex-grow: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .text {
@@ -281,12 +287,16 @@ const likeText = computed(() => {
   line-height: 1.4;
   word-break: break-word;
   margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .vibe-actions {
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   padding-top: 10px;
-  margin-top: 4px;
+  margin-top: auto;
 }
 
 .fire-btn {
