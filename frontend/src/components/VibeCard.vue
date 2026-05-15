@@ -11,7 +11,6 @@ const handleLike = async () => {
   try {
     const res = await api.post(`/vibes/${props.vibe.id}/like/`);
 
-    // Explicitly check if likes_count exists in response (even if it is 0)
     if (res.data && typeof res.data.likes_count !== 'undefined') {
       localLikes.value = Number(res.data.likes_count);
     }
@@ -42,7 +41,6 @@ const likeText = computed(() => {
     return `You and ${others} ${verb} vibing with this`;
   }
 
-  // Handle the 0 case specifically for unlikes
   if (count === 0) {
     return `0 people are vibing with this`;
   }
