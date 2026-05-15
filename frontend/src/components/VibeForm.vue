@@ -36,8 +36,8 @@ const submit = async () => {
     const payload = {
       ...form.value,
       track_id: musicData.value?.track_id || null,
-      start_seconds: musicData.value?.start_seconds || null,
-      end_seconds: musicData.value?.end_seconds || null
+      snippet_start: musicData.value?.start_seconds || null,
+      snippet_end: musicData.value?.end_seconds || null
     };
 
     const res = await api.post('/vibes/', payload);
